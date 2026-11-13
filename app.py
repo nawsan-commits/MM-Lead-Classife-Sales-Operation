@@ -398,14 +398,14 @@ with tab1:
             st.markdown("**Step 1 · Leads file (Salesforce)**")
             st.link_button(
                 "Open Leads Report →",
-                "https://deliveryhero.lightning.force.com/lightning/r/Report/00ObO000008clm5UAA/view?",  # Note: Update ID for Myanmar if necessary
+                "https://deliveryhero.lightning.force.com/lightning/r/Report/00ObO00000CSEnVUAX/view",  # Note: Update ID for Myanmar if necessary
                 use_container_width=True
             )
         with exp_col2:
             st.markdown("**Step 2 · CRM Export (Salesforce)**")
             st.link_button(
                 "Open Myanmar CRM Report →",
-                "https://deliveryhero.lightning.force.com/lightning/r/Report/00ObO000008cmAHUAY/view?queryScope=userFolders",  # Note: Update ID for Myanmar if necessary
+                "https://deliveryhero.lightning.force.com/lightning/r/Report/00ObO00000CSFV3UAP/view?queryScope=userFolders",  # Note: Update ID for Myanmar if necessary
                 use_container_width=True
             )
         st.info(
