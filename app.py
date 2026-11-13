@@ -362,11 +362,11 @@ default_categories = [
     "indian", "italian", "french", "western", "seafood", "bbq", "barbecue", 
     "hot pot", "sushi", "ramen", "pizza", "burger", "steak", "chicken", 
     "rice", "tea", "boba", "ice cream", "pastry", "donut", "sandwich", 
-    "soup", "mohinga", "deli", "cake",
+    "soup", "mohinga", "deli", "cake", "salad",
 
     # Burmese Categories
     "စားသောက်ဆိုင်", "ကော်ဖီဆိုင်", "လက်ဖက်ရည်ဆိုင်", "မုန့်ဆိုင်",
-    "အအေးဆိုင်", "စားစရာ", "ထမင်းဆိုင်", "ဘီယာဆိုင်", "အသားကင်", "ဟော့ပေါ့",
+    "အအေးဆိုင်", "စားစရာ", "ထမင်းဆိုင်", "ဘီယာဆိုင်", "အသားကင်", "ဟော့ပေါ့", "အသုပ်ဆိုင်",
 
     # Chinese Categories
     "餐馆", "中餐馆", "烧烤", "火锅", "火锅店", "咖啡", "咖啡店", 
