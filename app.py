@@ -97,10 +97,13 @@ def normalize_cambodian_text(text: Any) -> str:
 
 def clean_phone(val: Any) -> str:
     """Normalize phone numbers to the last 8 digits for fast hash matching."""
-    if pd.isna(val) or val is None:
+    if pd.isna(val) or val is None or str(val).lower() == 'nan':
         return ""
     s = str(val).split('.')[0].strip()
     digits = ''.join(filter(str.isdigit, s))
+    # FIX: Only return phone numbers that are at least 6 digits long to prevent false exact matches on junk data
+    if len(digits) < 6:
+        return ""
     return digits[-8:] if len(digits) >= 8 else digits
 
 def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -160,7 +163,7 @@ def find_crm_matches(
 ) -> Tuple[str, float, Optional[pd.Series], str]:
     # 1. High-speed O(1) GRID match
     lead_grid = str(lead_row.get(lead_cols.get('grid', ''), '')).strip().upper()
-    if lead_grid and lead_grid in crm_index['grids']:
+    if lead_grid and lead_grid != 'NAN' and lead_grid in crm_index['grids']:
         grid_col = crm_cols.get('grid')
         matched = crm_df[crm_df[grid_col].astype(str).str.strip().str.upper() == lead_grid] if grid_col else None
         match_row = matched.iloc[0] if matched is not None and not matched.empty else None
@@ -617,6 +620,14 @@ with tab2:
                 gen_grid_col = resolve_column(df_gen_urls, ['GRID'])
 
                 if gen_url_col and gen_grid_col:
+                    # 🔴 FIX: Deduplicate Apify Raw Data to prevent 1-to-Many GRID duplication
+                    initial_count = len(df_apify_raw)
+                    df_apify_raw = df_apify_raw.drop_duplicates(subset=[input_url_col], keep='first')
+                    dedup_count = initial_count - len(df_apify_raw)
+                    
+                    if dedup_count > 0:
+                        st.info(f"🧹 Auto-removed {dedup_count} duplicated places from Apify output to ensure 1-to-1 GRID mapping.")
+
                     merged_df = pd.merge(
                         df_apify_raw,
                         df_gen_urls[[gen_url_col, gen_grid_col]],
@@ -684,5 +695,3 @@ with tab4:
     - **Business Closed:** Google confirms permanently or temporarily closed
     - **Wrong Target Group:** Google Maps category is not food-delivery eligible
     """)
-
-
