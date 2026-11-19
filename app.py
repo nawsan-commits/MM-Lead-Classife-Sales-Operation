@@ -362,11 +362,11 @@ default_categories = [
     "indian", "italian", "french", "western", "seafood", "bbq", "barbecue", 
     "hot pot", "sushi", "ramen", "pizza", "burger", "steak", "chicken", 
     "rice", "tea", "boba", "ice cream", "pastry", "donut", "sandwich", 
-    "soup", "mohinga", "deli", "cake", "salad",
+    "soup", "mohinga", "deli", "cake",
 
     # Burmese Categories
     "စားသောက်ဆိုင်", "ကော်ဖီဆိုင်", "လက်ဖက်ရည်ဆိုင်", "မုန့်ဆိုင်",
-    "အအေးဆိုင်", "စားစရာ", "ထမင်းဆိုင်", "ဘီယာဆိုင်", "အသားကင်", "ဟော့ပေါ့", "အသုပ်ဆိုင်",
+    "အအေးဆိုင်", "စားစရာ", "ထမင်းဆိုင်", "ဘီယာဆိုင်", "အသားကင်", "ဟော့ပေါ့",
 
     # Chinese Categories
     "餐馆", "中餐馆", "烧烤", "火锅", "火锅店", "咖啡", "咖啡店", 
@@ -398,14 +398,14 @@ with tab1:
             st.markdown("**Step 1 · Leads file (Salesforce)**")
             st.link_button(
                 "Open Leads Report →",
-                "https://deliveryhero.lightning.force.com/lightning/r/Report/00ObO00000CSEnVUAX/view",  # Note: Update ID for Myanmar if necessary
+                "https://deliveryhero.lightning.force.com/lightning/r/Report/00ObO000008clm5UAA/view?",  # Note: Update ID for Myanmar if necessary
                 use_container_width=True
             )
         with exp_col2:
             st.markdown("**Step 2 · CRM Export (Salesforce)**")
             st.link_button(
                 "Open Myanmar CRM Report →",
-                "https://deliveryhero.lightning.force.com/lightning/r/Report/00ObO00000CSFV3UAP/view?queryScope=userFolders",  # Note: Update ID for Myanmar if necessary
+                "https://deliveryhero.lightning.force.com/lightning/r/Report/00ObO000008cmAHUAY/view?queryScope=userFolders",  # Note: Update ID for Myanmar if necessary
                 use_container_width=True
             )
         st.info(
@@ -626,6 +626,14 @@ with tab2:
                 gen_grid_col = resolve_column(df_gen_urls, ['GRID'])
 
                 if gen_url_col and gen_grid_col:
+                    # 🔴 FIX: Deduplicate Apify Raw Data to prevent 1-to-Many GRID duplication
+                    initial_count = len(df_apify_raw)
+                    df_apify_raw = df_apify_raw.drop_duplicates(subset=[input_url_col], keep='first')
+                    dedup_count = initial_count - len(df_apify_raw)
+                    
+                    if dedup_count > 0:
+                        st.info(f"🧹 Auto-removed {dedup_count} duplicated places from Apify output to ensure 1-to-1 GRID mapping.")
+
                     merged_df = pd.merge(
                         df_apify_raw,
                         df_gen_urls[[gen_url_col, gen_grid_col]],
