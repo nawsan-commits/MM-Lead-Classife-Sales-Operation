@@ -38,13 +38,13 @@ except ImportError:
 APP_PASSWORD = st.secrets.get("APP_PASSWORD", None) if "APP_PASSWORD" in st.secrets else None
 
 st.set_page_config(
-    page_title="Sales Ops · Myanmar Lead Classifier",
+    page_title="Sales Ops · Cambodia Lead Classifier",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for foodpanda / Delivery Hero Myanmar branding
+# Custom CSS for foodpanda / Delivery Hero Cambodia branding
 st.markdown("""
 <style>
     .main-title {
@@ -77,8 +77,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-def normalize_myanmar_text(text: Any) -> str:
-    """Normalize text allowing English and Burmese Unicode characters."""
+def normalize_cambodian_text(text: Any) -> str:
     if pd.isna(text) or text is None:
         return ""
     s = str(text).strip().lower()
@@ -87,31 +86,22 @@ def normalize_myanmar_text(text: Any) -> str:
 
     noise_patterns = [
         r'\bco\.?,?\s*ltd\.?\b', r'\bco\.?,?\s*ltd\b', r'\binc\.?\b',
-        r'\bexpress\b', r'\bmyanmar\b', r'\byangon\b',
-        r'\bmandalay\b', r'\benterprise\b', r'\bgroup\b'
+        r'\bexpress\b', r'\bcambodia\b', r'\bphnom\s*penh\b',
+        r'\bkhmer\b', r'\benterprise\b', r'\bgroup\b'
     ]
     for pattern in noise_patterns:
         s = re.sub(pattern, '', s, flags=re.IGNORECASE)
 
-    # Myanmar Unicode block: \u1000-\u109F
-    s = re.sub(r'[^\w\s\u1000-\u109F]', ' ', s)
+    s = re.sub(r'[^\w\s\u1780-\u17ff]', ' ', s)
     return re.sub(r'\s+', ' ', s).strip()
 
 def clean_phone(val: Any) -> str:
-    """Normalize phone numbers for Myanmar (stripping +95 and formatting with 0)."""
+    """Normalize phone numbers to the last 8 digits for fast hash matching."""
     if pd.isna(val) or val is None:
         return ""
     s = str(val).split('.')[0].strip()
     digits = ''.join(filter(str.isdigit, s))
-    
-    # Remove Myanmar country code if present
-    if digits.startswith('95') and len(digits) >= 11:
-        digits = digits[2:]
-    # Prepend 0 if it starts with 9 (standard local 09 format)
-    if digits.startswith('9') and len(digits) >= 8:
-        digits = '0' + digits
-        
-    return digits
+    return digits[-8:] if len(digits) >= 8 else digits
 
 def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     R = 6371000.0
@@ -186,13 +176,13 @@ def find_crm_matches(
             return "P4 — Duplicate", 100.0, match_row, f"Exact Phone match ({lead_phone})"
 
     # 3. Text/Name fuzzy proximity matching
-    lead_name = normalize_myanmar_text(lead_row.get(lead_cols.get('name', '')))
+    lead_name = normalize_cambodian_text(lead_row.get(lead_cols.get('name', '')))
     if not lead_name:
         return "P2 — Please Check", 0.0, None, "No Apify result or no category found"
 
     lead_lat = lead_row.get(lead_cols.get('lat', ''))
     lead_lng = lead_row.get(lead_cols.get('lng', ''))
-    lead_township = normalize_myanmar_text(lead_row.get(lead_cols.get('township', '')))
+    lead_sangkat = normalize_cambodian_text(lead_row.get(lead_cols.get('sangkat', '')))
 
     has_coords = pd.notnull(lead_lat) and pd.notnull(lead_lng)
     try:
@@ -209,7 +199,7 @@ def find_crm_matches(
     for _, crm_row in crm_df.iterrows():
         crm_lat = crm_row.get(crm_cols.get('lat', ''))
         crm_lng = crm_row.get(crm_cols.get('lng', ''))
-        crm_township = normalize_myanmar_text(crm_row.get(crm_cols.get('township', '')))
+        crm_sangkat = normalize_cambodian_text(crm_row.get(crm_cols.get('sangkat', '')))
         
         in_proximity = False
         dist_m = float('inf')
@@ -222,12 +212,12 @@ def find_crm_matches(
             except Exception:
                 pass
 
-        if not in_proximity and lead_township and crm_township:
-            if lead_township in crm_township or crm_township in lead_township:
+        if not in_proximity and lead_sangkat and crm_sangkat:
+            if lead_sangkat in crm_sangkat or crm_sangkat in lead_sangkat:
                 in_proximity = True
 
         if in_proximity:
-            crm_name = normalize_myanmar_text(crm_row.get(crm_cols.get('name', '')))
+            crm_name = normalize_cambodian_text(crm_row.get(crm_cols.get('name', '')))
             if not crm_name:
                 continue
 
@@ -242,7 +232,7 @@ def find_crm_matches(
             if score > best_score:
                 best_score = score
                 best_match_row = crm_row
-                match_reason = f"Proximity ({int(dist_m)}m)" if dist_m < float('inf') else f"Township Match ({crm_township})"
+                match_reason = f"Proximity ({int(dist_m)}m)" if dist_m < float('inf') else f"Sangkat Match ({crm_sangkat})"
 
     if best_score >= p4_threshold:
         return "P4 — Duplicate", best_score * 100.0, best_match_row, f"Name ≥ {int(p4_threshold*100)}% at same location ({match_reason})"
@@ -348,7 +338,7 @@ def export_to_excel(df_results: pd.DataFrame) -> bytes:
 
 # Sidebar Configuration
 st.sidebar.title("⚙️ Settings")
-country_filter = st.sidebar.text_input("Country Code Filter", "MM")
+country_filter = st.sidebar.text_input("Country Code Filter", "KH")
 p3_threshold = st.sidebar.slider("P3 Potential Match starts at (%)", 40, 80, 50, 5) / 100.0
 p4_threshold = st.sidebar.slider("P4 Duplicate starts at (%)", 60, 95, 75, 5) / 100.0
 proximity_radius = st.sidebar.slider("GPS Proximity Radius (Meters)", 50, 1000, 200, 50)
@@ -358,15 +348,16 @@ default_categories = [
     "restaurant", "cafe", "coffee", "bakery", "food", "noodle", "fast food", 
     "bubble tea", "bistro", "pub", "canteen", "eatery", "diner", "food court", 
     "food stall", "bar", "dessert", "beverage", "drink", "kitchen", "grill", 
-    "burmese", "asian", "chinese", "japanese", "korean", "thai", "vietnamese", 
+    "khmer", "asian", "chinese", "japanese", "korean", "thai", "vietnamese", 
     "indian", "italian", "french", "western", "seafood", "bbq", "barbecue", 
     "hot pot", "sushi", "ramen", "pizza", "burger", "steak", "chicken", 
     "rice", "tea", "boba", "ice cream", "pastry", "donut", "sandwich", 
-    "soup", "mohinga", "deli", "cake",
+    "soup", "lok lak", "nom banh chok", "prahok", "kway teow", "deli", "cake",
 
-    # Burmese Categories
-    "စားသောက်ဆိုင်", "ကော်ဖီဆိုင်", "လက်ဖက်ရည်ဆိုင်", "မုန့်ဆိုင်",
-    "အအေးဆိုင်", "စားစရာ", "ထမင်းဆိုင်", "ဘီယာဆိုင်", "အသားကင်", "ဟော့ပေါ့",
+    # Khmer Categories
+    "ភោជនីយដ្ឋាន", "ហាង​កាហ្វេ", "ហាងលក់ភេសជ្ជៈ", "អាហារដ្ឋាន", 
+    "កន្លែង​លក់​​អាហារ", "ផ្ទះបាយ", "អាហារ​​ពេល​ល្ងាច", "ខេធើរីង", 
+    "ហាង​លក់​ការ៉េម", "បា​តូច", "សេវា​ដឹកជញ្ជូន​ភីហ្សា", "ហាង​លក់​បង្អែម",
 
     # Chinese Categories
     "餐馆", "中餐馆", "烧烤", "火锅", "火锅店", "咖啡", "咖啡店", 
@@ -375,8 +366,8 @@ default_categories = [
 fnb_categories_input = st.sidebar.text_area("Eligible F&B Categories", ", ".join(default_categories))
 valid_categories_list = [c.strip().lower() for c in fnb_categories_input.split(",") if c.strip()]
 
-st.markdown('<p class="main-title">🎯 Sales Ops · Myanmar Lead Classifier</p>', unsafe_allow_html=True)
-st.markdown('<p class="sub-title"><b>Delivery Hero / foodpanda Myanmar</b> · Digital Sales APAC — Yangon & Provinces</p>', unsafe_allow_html=True)
+st.markdown('<p class="main-title">🎯 Sales Ops · Lead Classifier</p>', unsafe_allow_html=True)
+st.markdown('<p class="sub-title"><b>Delivery Hero / foodpanda Cambodia</b> · Digital Sales APAC — Phnom Penh & Provinces</p>', unsafe_allow_html=True)
 
 if APP_PASSWORD:
     pwd_input = st.sidebar.text_input("🔑 App Password", type="password")
@@ -398,14 +389,14 @@ with tab1:
             st.markdown("**Step 1 · Leads file (Salesforce)**")
             st.link_button(
                 "Open Leads Report →",
-                "https://deliveryhero.lightning.force.com/lightning/r/Report/00ObO000008clm5UAA/view?",  # Note: Update ID for Myanmar if necessary
+                "https://deliveryhero.lightning.force.com/lightning/r/Report/00ObO00000CSEnVUAX/view?queryScope=userFolders",
                 use_container_width=True
             )
         with exp_col2:
             st.markdown("**Step 2 · CRM Export (Salesforce)**")
             st.link_button(
                 "Open Myanmar CRM Report →",
-                "https://deliveryhero.lightning.force.com/lightning/r/Report/00ObO000008cmAHUAY/view?queryScope=userFolders",  # Note: Update ID for Myanmar if necessary
+                "https://deliveryhero.lightning.force.com/lightning/r/Report/00ObO00000CSFV3UAP/view?queryScope=userFolders",
                 use_container_width=True
             )
         st.info(
@@ -444,7 +435,7 @@ with tab1:
                     elif 'generated_urls_df' in st.session_state:
                         df_apify = st.session_state['generated_urls_df']
 
-                    # 0. Filter for Myanmar Nationwide
+                    # 0. Filter for Cambodia Nationwide
                     if df_apify is not None and 'countryCode' in df_apify.columns and country_filter:
                         df_apify = df_apify[df_apify['countryCode'].astype(str).str.upper() == country_filter.upper()].copy()
 
@@ -453,7 +444,7 @@ with tab1:
                         'name': resolve_column(df_leads, ['Company / Account', 'Company', 'Lead Name', 'Name']),
                         'phone': resolve_column(df_leads, ['Phone', 'Telephone', 'Mobile']),
                         'street': resolve_column(df_leads, ['Street / Street No.', 'Street', 'Address']),
-                        'township': resolve_column(df_leads, ['Township / Region / State', 'Township', 'District', 'City']),
+                        'sangkat': resolve_column(df_leads, ['Sangkat / Khan / Province', 'Sangkat', 'District', 'City']),
                         'lat': resolve_column(df_leads, ['Coordinates (Latitude)', 'Latitude', 'Lat']),
                         'lng': resolve_column(df_leads, ['Coordinates (Longitude)', 'Longitude', 'Lng'])
                     }
@@ -462,7 +453,7 @@ with tab1:
                         'grid': resolve_column(df_crm, ['GRID', 'Account ID', 'Id']),
                         'name': resolve_column(df_crm, ['Account Name', 'Name']),
                         'phone': resolve_column(df_crm, ['Phone', 'Telephone', 'Mobile']),
-                        'township': resolve_column(df_crm, ['Township / Region', 'Township', 'District']),
+                        'sangkat': resolve_column(df_crm, ['Sangkat / Khan', 'Sangkat', 'District']),
                         'lat': resolve_column(df_crm, ['Latitude', 'Lat']),
                         'lng': resolve_column(df_crm, ['Longitude', 'Lng'])
                     }
@@ -538,7 +529,7 @@ with tab1:
                     st.download_button(
                         label="📥 Download Excel Report",
                         data=excel_bytes,
-                        file_name="Myanmar_Classified_Leads_Report.xlsx",
+                        file_name="Cambodia_Classified_Leads_Report.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         type="primary"
                     )
@@ -557,7 +548,7 @@ with tab2:
         
         grid_col = resolve_column(df_step1, ['GRID', 'Lead ID', 'Id'])
         name_col = resolve_column(df_step1, ['Company / Account', 'Company', 'Lead Name', 'Name'])
-        township_col = resolve_column(df_step1, ['Township / Region / State', 'Township', 'District', 'City', 'Street'])
+        sangkat_col = resolve_column(df_step1, ['Sangkat / Khan / Province', 'Sangkat', 'District', 'City', 'Street'])
 
         if name_col:
             generated_data = []
@@ -565,10 +556,10 @@ with tab2:
                 grid_val = row.get(grid_col, f"GRID_{idx}") if grid_col else f"GRID_{idx}"
                 name_val = str(row.get(name_col, '')).strip()
                 
-                township_raw = row.get(township_col, '') if township_col else ""
-                township_val = "" if pd.isna(township_raw) or str(township_raw).lower() == 'nan' else str(township_raw).strip()
+                sangkat_raw = row.get(sangkat_col, '') if sangkat_col else ""
+                sangkat_val = "" if pd.isna(sangkat_raw) or str(sangkat_raw).lower() == 'nan' else str(sangkat_raw).strip()
                 
-                full_query = f"{name_val} {township_val} Myanmar".strip()
+                full_query = f"{name_val} {sangkat_val} Cambodia".strip()
                 full_query = re.sub(r'\s+', ' ', full_query)
                 
                 encoded_q = urllib.parse.quote(full_query)
@@ -626,14 +617,6 @@ with tab2:
                 gen_grid_col = resolve_column(df_gen_urls, ['GRID'])
 
                 if gen_url_col and gen_grid_col:
-                    # 🔴 FIX: Deduplicate Apify Raw Data to prevent 1-to-Many GRID duplication
-                    initial_count = len(df_apify_raw)
-                    df_apify_raw = df_apify_raw.drop_duplicates(subset=[input_url_col], keep='first')
-                    dedup_count = initial_count - len(df_apify_raw)
-                    
-                    if dedup_count > 0:
-                        st.info(f"🧹 Auto-removed {dedup_count} duplicated places from Apify output to ensure 1-to-1 GRID mapping.")
-
                     merged_df = pd.merge(
                         df_apify_raw,
                         df_gen_urls[[gen_url_col, gen_grid_col]],
@@ -674,7 +657,7 @@ with tab3:
             for i in range(len(records)):
                 for j in range(i + 1, len(records)):
                     r1, r2 = records[i], records[j]
-                    n1, n2 = normalize_myanmar_text(r1.get(name_col)), normalize_myanmar_text(r2.get(name_col))
+                    n1, n2 = normalize_cambodian_text(r1.get(name_col)), normalize_cambodian_text(r2.get(name_col))
                     if n1 and n2:
                         score = fuzz.token_set_ratio(n1, n2) / 100.0
                         if score >= p4_threshold:
@@ -691,7 +674,7 @@ with tab3:
 
 with tab4:
     st.markdown("""
-    ### 📖 Myanmar Lead Classifier Guide
+    ### 📖 Cambodian Lead Classifier Guide
     
     #### Classification Definitions
     - **P1 — New:** No CRM match, Apify-confirmed restaurant
@@ -701,3 +684,5 @@ with tab4:
     - **Business Closed:** Google confirms permanently or temporarily closed
     - **Wrong Target Group:** Google Maps category is not food-delivery eligible
     """)
+
+
